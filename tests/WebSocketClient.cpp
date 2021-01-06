@@ -1,4 +1,4 @@
-#include "WebSocketClient.h"
+#include "network-monitor/WebSocketClient.h"
 
 #include <boost/asio.hpp>
 
