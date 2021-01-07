@@ -2,6 +2,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <boost/beast/ssl.hpp>
 #include <boost/system/error_code.hpp>
 
 #include <chrono>
@@ -26,11 +27,12 @@ static void Log(const std::string& where, boost::system::error_code ec)
 WebSocketClient::WebSocketClient(
 	const std::string& url,
 	const std::string& port,
-	boost::asio::io_context& ioc
+	boost::asio::io_context& ioc,
+	boost::asio::ssl::context& ctx
 ) : m_url{url}, 
 	m_port{port},
 	m_resolver{boost::asio::make_strand(ioc)},
-	m_ws{boost::asio::make_strand(ioc)}
+	m_ws{boost::asio::make_strand(ioc), ctx}
 {
 
 }
@@ -95,9 +97,9 @@ void WebSocketClient::OnResolve(
     // The following timeout only matters for the purpose of connecting to the
     // TCP socket. We will reset the timeout to a sensible default after we are
     // connected.
-    m_ws.next_layer().expires_after(std::chrono::seconds(5));
+    boost::beast::get_lowest_layer(m_ws).expires_after(std::chrono::seconds(5));
 
-	m_ws.next_layer().async_connect(*endpoint,
+	boost::beast::get_lowest_layer(m_ws).async_connect(*endpoint,
 	    [this](auto ec) {
 	        OnConnect(ec);
 	    }
@@ -118,10 +120,30 @@ void WebSocketClient::OnConnect(
 
     // Now that the TCP socket is connected, we can reset the timeout to
     // whatever Boost.Beast recommends.
-    m_ws.next_layer().expires_never();
+    boost::beast::get_lowest_layer(m_ws).expires_never();
     m_ws.set_option(websocket::stream_base::timeout::suggested(
         boost::beast::role_type::client
     ));
+
+	// Attempt a TLS handshake.
+    m_ws.next_layer().async_handshake(boost::asio::ssl::stream_base::client,
+        [this](auto ec) {
+            OnTlsHandshake(ec);
+        }
+    );
+}
+
+void WebSocketClient::OnTlsHandshake(
+	const boost::system::error_code& ec
+)
+{
+	if (ec) {
+		Log("OnTlsHandshake", ec);
+		if (clb_OnConnect) {
+			clb_OnConnect(ec);
+		}
+		return;
+	}
 
     m_ws.async_handshake(m_url, "/",
         [this](auto ec) {
