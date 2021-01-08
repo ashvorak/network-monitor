@@ -19,6 +19,8 @@ public:
      *  \note This constructor does not initiate a connection.
      *
      *  \param url  The URL of the server.
+     *  \param endpoint The endpoint on the server to connect to.
+     *                  Example: echo.websocket.org/<endpoint>
      *  \param port The port on the server.
      *  \param ioc  The io_context object. The user takes care of calling
      *              ioc.run().
@@ -26,6 +28,7 @@ public:
      */
     WebSocketClient(
         const std::string& url,
+        const std::string& endpoint,
         const std::string& port,
         boost::asio::io_context& ioc,
         boost::asio::ssl::context& ctx
@@ -73,6 +76,7 @@ public:
 
 	private:
 		std::string m_url {};
+		std::string m_endpoint {};
 		std::string m_port {};
 
 		boost::asio::ip::tcp::resolver m_resolver;
