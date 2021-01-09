@@ -13,13 +13,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(Boost 1.74 REQUIRED COMPONENTS system unit_test_framework)
 find_package(Filesystem REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 
 # Called before any other target is defined.
 enable_testing()
 
 # Static library
 set(LIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocketClient.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocketClient.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/FileDownloader.cpp"
 )
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
@@ -34,12 +36,16 @@ target_link_libraries(network-monitor
     PUBLIC
 		Boost::Boost
 		OpenSSL::OpenSSL
+		std::filesystem
+	PRIVATE	
+		CURL::CURL
 )
 
 # Tests
 set(TESTS_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/WebSocketClient.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/WebSocketClient.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/FileDownloader.cpp"
 )
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
