@@ -168,7 +168,7 @@ bool TransportNetwork::RecordPassengerEvent(
 	return true;
 }
 
-long long int TransportNetwork::GetPassengerCount(
+int64_t TransportNetwork::GetPassengerCount(
 	const Id& stationId
 ) const
 {
@@ -218,7 +218,7 @@ std::vector<Id> TransportNetwork::GetRoutesServingStation(
 bool TransportNetwork::SetTravelTime(
 	const Id& stationIdA,
 	const Id& stationIdB,
-	const unsigned int travelTime
+	const uint32_t travelTime
 )
 {
 	const auto stationA {GetStation(stationIdA)};
@@ -242,7 +242,7 @@ bool TransportNetwork::SetTravelTime(
 	return foundEdge;
 }
 
-unsigned int TransportNetwork::GetTravelTime(
+uint32_t TransportNetwork::GetTravelTime(
 	const Id& stationIdA,
 	const Id& stationIdB
 ) const
@@ -268,7 +268,7 @@ unsigned int TransportNetwork::GetTravelTime(
 	return 0;
 }
 
-unsigned int TransportNetwork::GetTravelTime(
+uint32_t  TransportNetwork::GetTravelTime(
 	const Id& lineId,
 	const Id& routeId,
 	const Id& stationIdA,
@@ -292,7 +292,7 @@ unsigned int TransportNetwork::GetTravelTime(
 	}
 
 	bool foundA {false};
-	unsigned int travelTime {0};
+	uint32_t travelTime {0};
 	for (const auto& station : route->stops) {
 		if (station == stationA) {
 			foundA = true;

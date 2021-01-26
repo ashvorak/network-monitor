@@ -189,7 +189,7 @@ public:
      *
      *  \throws std::runtime_error if the station is not in the network.
      */
-    long long int GetPassengerCount(
+    int64_t GetPassengerCount(
         const Id& stationId
     ) const;
 
@@ -219,7 +219,7 @@ public:
     bool SetTravelTime(
         const Id& stationIdA,
         const Id& stationIdB,
-        const unsigned int travelTime
+        const uint32_t travelTime
     );
 
     /*! \brief Get the travel time between 2 adjacent stations.
@@ -233,7 +233,7 @@ public:
      *  The two stations must be adjacent in at least one line route. The two
      *  stations must already be in the network.
      */
-    unsigned int GetTravelTime(
+    uint32_t GetTravelTime(
         const Id& stationIdA,
         const Id& stationIdB
     ) const;
@@ -250,7 +250,7 @@ public:
      *  The two stations must be both served by the `route`. The two stations
      *  must already be in the network.
      */
-    unsigned int GetTravelTime(
+    uint32_t GetTravelTime(
         const Id& lineId,
         const Id& routeId,
         const Id& stationIdA,

@@ -396,7 +396,7 @@ BOOST_AUTO_TEST_CASE(basic)
     ok = nw.AddLine(line);
     BOOST_REQUIRE(ok);
 
-    unsigned int travelTime {0};
+    uint32_t travelTime {0};
 
     // Get travel time before setting it.
     travelTime = nw.GetTravelTime(station0.id, station1.id);
@@ -489,7 +489,7 @@ BOOST_AUTO_TEST_CASE(over_route)
     ok &= nw.SetTravelTime(station3.id, station1.id, 4);
 
     // Check the cumulative travel times.
-    unsigned int travelTime {0};
+    uint32_t travelTime {0};
     // route0
     BOOST_CHECK_EQUAL(
         nw.GetTravelTime(line.id, route0.id, station0.id, station1.id), 1);
