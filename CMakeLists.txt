@@ -23,6 +23,7 @@ enable_testing()
 set(LIB_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocketClient.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/FileDownloader.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/TransportNetwork.cpp"
 )
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
@@ -48,6 +49,7 @@ set(TESTS_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/WebSocketClient.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/FileDownloader.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/TransportNetwork.cpp"
 )
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
