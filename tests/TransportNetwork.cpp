@@ -1,4 +1,5 @@
 #include <network-monitor/TransportNetwork.h>
+#include <network-monitor/FileDownloader.h>
 
 #include <boost/test/unit_test.hpp>
 
@@ -13,6 +14,8 @@ using NetworkMonitor::PassengerEvent;
 using NetworkMonitor::Route;
 using NetworkMonitor::Station;
 using NetworkMonitor::TransportNetwork;
+
+using NetworkMonitor::ParseJsonFile;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -527,6 +530,91 @@ BOOST_AUTO_TEST_CASE(over_route)
 
 BOOST_AUTO_TEST_SUITE_END(); // TravelTime
 
+BOOST_AUTO_TEST_SUITE(FromJson);
+
+BOOST_AUTO_TEST_CASE(from_json_1line_1route)
+{
+    auto testFilePath {
+        std::filesystem::path(TESTS_JSON_FOLDER) / "from_json_1line_1route.json"
+    };
+    auto src = ParseJsonFile(testFilePath);
+
+    TransportNetwork nw {};
+    auto ok {nw.FromJson(std::move(src))};
+    BOOST_REQUIRE(ok);
+
+    auto routes {nw.GetRoutesServingStation("station_0")};
+    BOOST_REQUIRE_EQUAL(routes.size(), 1);
+    BOOST_CHECK_EQUAL(routes[0], "route_0");
+
+	auto travelTime {nw.GetTravelTime(
+		"line_0",
+		"route_0",
+		"station_0",
+		"station_1"
+		)
+	};
+	BOOST_REQUIRE_EQUAL(travelTime, 5);
+	BOOST_REQUIRE_EQUAL(nw.GetTravelTime("station_0", "station_1"), 5);
+	BOOST_REQUIRE_EQUAL(nw.GetTravelTime("station_1", "station_0"), 5);
+}
+
+BOOST_AUTO_TEST_CASE(from_json_not_connected_stations)
+{
+    auto testFilePath {
+        std::filesystem::path(TESTS_JSON_FOLDER) / "from_json_not_connected_stations.json"
+    };
+    auto src = ParseJsonFile(testFilePath);
+
+    TransportNetwork nw {};
+	auto ok {nw.FromJson(std::move(src))};
+    BOOST_REQUIRE(ok);
+
+	auto routes {nw.GetRoutesServingStation("station_3")};
+    BOOST_REQUIRE_EQUAL(routes.size(), 0);
+
+	BOOST_REQUIRE_EQUAL(nw.GetTravelTime("station_0", "station_3"), 0);
+}
+
+BOOST_AUTO_TEST_CASE(from_json_bad_travel_times)
+{
+    auto testFilePath {
+        std::filesystem::path(TESTS_JSON_FOLDER) / "from_json_bad_travel_times.json"
+    };
+    auto src = ParseJsonFile(testFilePath);
+
+    TransportNetwork nw {};
+    auto ok {nw.FromJson(std::move(src))};
+    BOOST_REQUIRE(!ok);
+}
+
+BOOST_AUTO_TEST_CASE(from_json_network_layout)
+{
+	auto testFilePath {
+        std::filesystem::path(TESTS_JSON_FOLDER) / "network-layout.json"
+    };
+    auto src = ParseJsonFile(testFilePath);
+
+    TransportNetwork nw {};
+    auto ok {nw.FromJson(std::move(src))};
+    BOOST_REQUIRE(ok);
+
+    auto routes {nw.GetRoutesServingStation("station_000")};
+    BOOST_REQUIRE_EQUAL(routes.size(), 2);
+    BOOST_CHECK_EQUAL(routes[0], "route_000");
+
+	auto travelTime {nw.GetTravelTime(
+		"line_005",
+		"route_031",
+		"station_145",
+		"station_150"
+		)
+	};
+	BOOST_REQUIRE_EQUAL(travelTime, 6);
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // FromJson
+
 BOOST_AUTO_TEST_SUITE_END(); // class_TransportNetwork
 
-BOOST_AUTO_TEST_SUITE_END(); // websocket_client
+BOOST_AUTO_TEST_SUITE_END(); // network_monitor

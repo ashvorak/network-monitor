@@ -51,15 +51,19 @@ set(TESTS_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/FileDownloader.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/TransportNetwork.cpp"
 )
+set(TESTS_DATA
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/tests_data"
+)
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
     PRIVATE
         cxx_std_17
 )
 target_compile_definitions(network-monitor-tests
-    PRIVATE
-		TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
-		TESTS_NETWORK_LAYOUT_JSON="${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json"
+	PRIVATE
+		TESTS_CACERT_PEM="${TESTS_DATA}/cacert.pem"
+		TESTS_JSON_FOLDER="${TESTS_DATA}/json"
+		TESTS_NETWORK_LAYOUT_JSON="${TESTS_DATA}/json/network-layout.json"
 )
 target_link_libraries(network-monitor-tests
     PRIVATE

@@ -50,6 +50,65 @@ TransportNetwork& TransportNetwork::operator=(
 	TransportNetwork&& moved
 ) = default;
 
+bool TransportNetwork::FromJson(
+	nlohmann::json&& src
+)
+{
+	for (auto&& stationJson : src.at("stations")) {
+		Station station {	
+			std::move(stationJson.at("station_id").get<std::string>()), 
+			std::move(stationJson.at("name").get<std::string>())
+		};
+
+		if (!AddStation(station)) {
+			throw std::runtime_error("Can't add station : " + station.id);
+		}
+	}
+
+	for (auto&& lineJson : src.at("lines")) {
+
+		std::vector<Route> routes {};
+		auto routesJson = lineJson.at("routes");
+
+		routes.reserve(routesJson.size());
+		for (auto&& routeJson : routesJson) {
+			Route route {
+				std::move(routeJson.at("route_id").get<std::string>()),
+				std::move(routeJson.at("direction").get<std::string>()),
+				std::move(routeJson.at("line_id").get<std::string>()),
+				std::move(routeJson.at("start_station_id").get<std::string>()),
+				std::move(routeJson.at("end_station_id").get<std::string>()),
+				std::move(routeJson.at("route_stops").get<std::vector<Id>>())
+			};
+
+			routes.emplace_back(std::move(route));
+		}
+
+		Line line {
+			std::move(lineJson.at("line_id").get<std::string>()), 
+			std::move(lineJson.at("name").get<std::string>()),
+			std::move(routes)
+		};
+
+		if (!AddLine(line)) {
+			throw std::runtime_error("Can't add line : " + line.id);
+		}
+	}
+
+	for (auto&& travelTimeJson : src.at("travel_times")) {
+
+		if (!SetTravelTime(
+				travelTimeJson.at("start_station_id").get<std::string>(),
+				travelTimeJson.at("end_station_id").get<std::string>(),
+				travelTimeJson.at("travel_time").get<uint32_t>())
+			) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool TransportNetwork::AddStation(const Station& station)
 {
 	if (GetStation(station.id)) {
