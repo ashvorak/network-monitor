@@ -82,8 +82,8 @@ public:
 			[this](auto ec, auto endpoint) {
 				OnResolve(ec, endpoint);
 			}
-	);
-}	
+		);
+	}		
 
     /*! \brief Send a text message to the WebSocket server.
      *
