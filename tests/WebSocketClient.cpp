@@ -15,12 +15,14 @@ using NetworkMonitor::MockWebSocketClient;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
+static boost::unit_test::timeout gTimeout {3};
+
 BOOST_AUTO_TEST_CASE(cacert_pem)
 {
     BOOST_CHECK(std::filesystem::exists(TESTS_CACERT_PEM));
 }
-
-BOOST_AUTO_TEST_CASE(class_WebSocketClient)
+ 
+BOOST_AUTO_TEST_CASE(class_WebSocketClient, *gTimeout)
 {
     // Connection targets
     const std::string url {"echo.websocket.org"};
@@ -94,7 +96,7 @@ bool CheckResponse(const std::string& response)
     return ok;
 }
 
-BOOST_AUTO_TEST_CASE(STOMP_frame)
+BOOST_AUTO_TEST_CASE(get_error_stomp_frame, *gTimeout)
 {
     // Connection targets
     const std::string url {"ltnm.learncppthroughprojects.com"};
@@ -164,8 +166,6 @@ BOOST_AUTO_TEST_CASE(STOMP_frame)
 	BOOST_CHECK(CheckResponse(responce));
 }
 
-static boost::unit_test::timeout gTimeout {3};
-
 // This fixture is used to re-initialize all mock properties before a test.
 struct WebSocketClientTestFixture {
     WebSocketClientTestFixture()
@@ -174,9 +174,9 @@ struct WebSocketClientTestFixture {
     }
 };
 
-BOOST_FIXTURE_TEST_SUITE(Connect, WebSocketClientTestFixture);
+BOOST_FIXTURE_TEST_SUITE(class_MockResolver, WebSocketClientTestFixture);
 
-BOOST_AUTO_TEST_CASE(mock_resolver, *gTimeout) 
+BOOST_AUTO_TEST_CASE(failed_on_connect, *gTimeout) 
 {
 	// Connection targets
     const std::string url {"echo.websocket.org"};
@@ -205,6 +205,6 @@ BOOST_AUTO_TEST_CASE(mock_resolver, *gTimeout)
     BOOST_CHECK(calledOnConnect);
 }
 
-BOOST_AUTO_TEST_SUITE_END(); // Connect, WebSocketClientTestFixture
+BOOST_AUTO_TEST_SUITE_END(); // MockResolver, WebSocketClientTestFixture
 
 BOOST_AUTO_TEST_SUITE_END(); // network_monitor
