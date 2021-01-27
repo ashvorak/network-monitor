@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <string>
 
-using NetworkMonitor::WebSocketClient;
+using NetworkMonitor::BoostWebSocketClient;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
 	ctx.load_verify_file(TESTS_CACERT_PEM);
 
     // The class under test
-    WebSocketClient client {url, endpoint, port, ioc, ctx};
+    BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.
@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(STOMP_frame)
 	ctx.load_verify_file(TESTS_CACERT_PEM);
 
     // The class under test
-    WebSocketClient client {url, endpoint, port, ioc, ctx};
+    BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.

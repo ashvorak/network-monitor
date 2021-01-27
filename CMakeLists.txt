@@ -21,7 +21,6 @@ enable_testing()
 
 # Static library
 set(LIB_SOURCES
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocketClient.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/FileDownloader.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/TransportNetwork.cpp"
 )
