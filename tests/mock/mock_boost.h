@@ -139,6 +139,62 @@ void async_teardown(
     return;
 }
 
+/*! \brief Mock the SSL socket stream from Boost.Beast.
+ */
+template<class NextLayer>
+class MockSslStream : public boost::beast::ssl_stream<NextLayer> {
+public:
+	/*! \brief Inherit all constructors from the parent class.
+     */
+    using boost::beast::ssl_stream<NextLayer>::ssl_stream;
+
+	static boost::system::error_code handshake_ec;
+
+	/*! \brief Mock for ssl_stream::async_handshake
+     */
+    template <typename HandshakeHandler>
+    void async_handshake(
+        boost::asio::ssl::stream_base::handshake_type type,
+        HandshakeHandler&& handler
+    )
+    {
+        return boost::asio::async_initiate<
+            HandshakeHandler,
+            void (boost::system::error_code)
+        >(
+            [](auto&& handler, auto stream) {
+                // Call the user callback.
+                boost::asio::post(
+                    stream->get_executor(),
+                    boost::beast::bind_handler(
+                        std::move(handler),
+                        MockSslStream::handshake_ec
+                    )
+                );
+            },
+            handler,
+            this
+        );
+    }
+};
+
+// Out-of-line static member initialization
+template<typename NextLayer>
+inline boost::system::error_code MockSslStream<NextLayer>::handshake_ec {};
+
+// This overload is required by Boost.Beast when you define a custom stream.
+template <typename TeardownHandler>
+void async_teardown(
+    boost::beast::role_type role,
+    MockSslStream<MockTcpStream>& socket,
+    TeardownHandler&& handler
+)
+{
+	return;
+}
+
+using MockTlsStream = MockSslStream<MockTcpStream>;
+
 /*! \brief Type alias for the mocked WebSocketClient.
  *
  *  For now we only mock the DNS resolver.
@@ -146,7 +202,7 @@ void async_teardown(
 using MockWebSocketClient = WebSocketClient<
     MockResolver,
     boost::beast::websocket::stream<
-        boost::beast::ssl_stream<MockTcpStream>
+        MockSslStream<MockTcpStream>
     >
 >;
 
