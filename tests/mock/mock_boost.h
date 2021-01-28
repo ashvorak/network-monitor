@@ -193,17 +193,57 @@ void async_teardown(
 	return;
 }
 
+/*! \brief Mock the websocket::stream from Boost.Beast.
+ */
+template<class NextLayer>
+class MockWebSocketStream : public boost::beast::websocket::stream<NextLayer> {
+public:	
+	/*! \brief Inherit all constructors from the parent class.
+     */
+    using boost::beast::websocket::stream<NextLayer>::stream;
+
+	static boost::system::error_code handshake_ec;
+
+	template<class HandshakeHandler>
+	void async_handshake(
+		boost::string_view host,
+		boost::string_view target,
+		HandshakeHandler&& handler)
+    {
+        return boost::asio::async_initiate<
+            HandshakeHandler,
+            void (boost::system::error_code)
+        >(
+            [](auto&& handler, auto stream, auto host, auto targer) {
+                // Call the user callback.
+                boost::asio::post(
+                    stream->get_executor(),
+                    boost::beast::bind_handler(
+                        std::move(handler),
+                        MockWebSocketStream::handshake_ec
+                    )
+                );
+            },
+            handler,
+            this,
+			host.to_string(),
+			target.to_string()
+        );
+    }
+};
+
+// Out-of-line static member initialization
+template<typename NextLayer>
+inline boost::system::error_code MockWebSocketStream<NextLayer>::handshake_ec {};
+
 using MockTlsStream = MockSslStream<MockTcpStream>;
+
+using MockTlsWebStream = MockWebSocketStream<MockTlsStream>;
 
 /*! \brief Type alias for the mocked WebSocketClient.
  *
  *  For now we only mock the DNS resolver.
  */
-using MockWebSocketClient = WebSocketClient<
-    MockResolver,
-    boost::beast::websocket::stream<
-        MockSslStream<MockTcpStream>
-    >
->;
+using MockWebSocketClient = WebSocketClient<MockResolver, MockTlsWebStream>;
 
 } // NetworkMonitor

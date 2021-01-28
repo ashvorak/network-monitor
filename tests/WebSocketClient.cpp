@@ -13,6 +13,7 @@ using NetworkMonitor::BoostWebSocketClient;
 using NetworkMonitor::MockResolver;
 using NetworkMonitor::MockTcpStream;
 using NetworkMonitor::MockTlsStream;
+using NetworkMonitor::MockTlsWebStream;
 using NetworkMonitor::MockWebSocketClient;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
@@ -177,6 +178,7 @@ struct WebSocketClientTestFixture {
         MockResolver::resolve_ec = {};
 		MockTcpStream::connect_ec = {};
 		MockTlsStream::handshake_ec = {};
+		MockTlsWebStream::handshake_ec = {};
     }
 };
 
@@ -253,6 +255,34 @@ BOOST_AUTO_TEST_CASE(fail_tls_handshake, *gTimeout)
 
     // Set the expected error codes.
     MockTlsStream::handshake_ec
+			= boost::asio::error::connection_reset;
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnConnect {false};
+    auto onConnect {[&calledOnConnect](auto ec) {
+        calledOnConnect = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::connection_reset);
+    }};
+    client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnConnect);
+}
+
+BOOST_AUTO_TEST_CASE(fail_handshake, *gTimeout)
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    // Set the expected error codes.
+    MockTlsWebStream::handshake_ec
 			= boost::asio::error::connection_reset;
 
     MockWebSocketClient client {url, endpoint, port, ioc, ctx};
