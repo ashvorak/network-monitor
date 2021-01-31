@@ -13,7 +13,7 @@ using NetworkMonitor::BoostWebSocketClient;
 using NetworkMonitor::MockResolver;
 using NetworkMonitor::MockTcpStream;
 using NetworkMonitor::MockTlsStream;
-using NetworkMonitor::MockTlsWebStream;
+using NetworkMonitor::MockTlsWebSocketStream;
 using NetworkMonitor::MockWebSocketClient;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
@@ -103,7 +103,6 @@ bool CheckResponse(const std::string& response)
 
 BOOST_AUTO_TEST_CASE(get_error_stomp_frame, *gTimeout)
 {
-    // Connection targets
     const std::string url {"ltnm.learncppthroughprojects.com"};
 	const std::string endpoint {"/network-events"};
     const std::string port {"443"};
@@ -171,6 +170,8 @@ BOOST_AUTO_TEST_CASE(get_error_stomp_frame, *gTimeout)
 	BOOST_CHECK(CheckResponse(responce));
 }
 
+BOOST_AUTO_TEST_SUITE(mock_boost);
+
 // This fixture is used to re-initialize all mock properties before a test.
 struct WebSocketClientTestFixture {
     WebSocketClientTestFixture()
@@ -178,15 +179,20 @@ struct WebSocketClientTestFixture {
         MockResolver::resolve_ec = {};
 		MockTcpStream::connect_ec = {};
 		MockTlsStream::handshake_ec = {};
-		MockTlsWebStream::handshake_ec = {};
+		MockTlsWebSocketStream::handshake_ec = {};
+		MockTlsWebSocketStream::handshake_ec = {};
+		MockTlsWebSocketStream::write_ec = {};
+		MockTlsWebSocketStream::read_ec = {};
+		MockTlsWebSocketStream::close_ec = {};
+
+		MockTlsWebSocketStream::sReadBuffer = "";
     }
 };
 
-BOOST_FIXTURE_TEST_SUITE(mock_boost, WebSocketClientTestFixture);
+BOOST_FIXTURE_TEST_SUITE(Connect, WebSocketClientTestFixture);
 
 BOOST_AUTO_TEST_CASE(fail_connect, *gTimeout) 
 {
-	// Connection targets
     const std::string url {"echo.websocket.org"};
 	const std::string endpoint {"/"};
     const std::string port {"443"};
@@ -194,8 +200,7 @@ BOOST_AUTO_TEST_CASE(fail_connect, *gTimeout)
     // Always start with an I/O context object.
     boost::asio::io_context ioc {};
 
-	MockResolver::resolve_ec 
-				= boost::asio::error::host_not_found;
+	MockResolver::resolve_ec = boost::asio::error::host_not_found;
 
 	// Contex object for SSL
 	boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
@@ -216,7 +221,6 @@ BOOST_AUTO_TEST_CASE(fail_connect, *gTimeout)
 
 BOOST_AUTO_TEST_CASE(fail_socket_connect, *gTimeout)
 {
-    // We use the mock client so we don't really connect to the target.
     const std::string url {"echo.websocket.org"};
     const std::string endpoint {"/"};
     const std::string port {"443"};
@@ -226,8 +230,7 @@ BOOST_AUTO_TEST_CASE(fail_socket_connect, *gTimeout)
     boost::asio::io_context ioc {};
 
     // Set the expected error codes.
-    MockTcpStream::connect_ec 
-			= boost::asio::error::connection_refused;
+    MockTcpStream::connect_ec = boost::asio::error::connection_refused;
 
     MockWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnConnect {false};
@@ -244,7 +247,6 @@ BOOST_AUTO_TEST_CASE(fail_socket_connect, *gTimeout)
 
 BOOST_AUTO_TEST_CASE(fail_tls_handshake, *gTimeout)
 {
-    // We use the mock client so we don't really connect to the target.
     const std::string url {"echo.websocket.org"};
     const std::string endpoint {"/"};
     const std::string port {"443"};
@@ -254,8 +256,7 @@ BOOST_AUTO_TEST_CASE(fail_tls_handshake, *gTimeout)
     boost::asio::io_context ioc {};
 
     // Set the expected error codes.
-    MockTlsStream::handshake_ec
-			= boost::asio::error::connection_reset;
+    MockTlsStream::handshake_ec = boost::asio::error::connection_reset;
 
     MockWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnConnect {false};
@@ -272,7 +273,6 @@ BOOST_AUTO_TEST_CASE(fail_tls_handshake, *gTimeout)
 
 BOOST_AUTO_TEST_CASE(fail_handshake, *gTimeout)
 {
-    // We use the mock client so we don't really connect to the target.
     const std::string url {"echo.websocket.org"};
     const std::string endpoint {"/"};
     const std::string port {"443"};
@@ -282,8 +282,7 @@ BOOST_AUTO_TEST_CASE(fail_handshake, *gTimeout)
     boost::asio::io_context ioc {};
 
     // Set the expected error codes.
-    MockTlsWebStream::handshake_ec
-			= boost::asio::error::connection_reset;
+    MockTlsWebSocketStream::handshake_ec = boost::asio::error::connection_reset;
 
     MockWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnConnect {false};
@@ -298,7 +297,158 @@ BOOST_AUTO_TEST_CASE(fail_handshake, *gTimeout)
     BOOST_CHECK(calledOnConnect);
 }
 
-BOOST_AUTO_TEST_SUITE_END(); // mock_boost, WebSocketClientTestFixture
+BOOST_AUTO_TEST_SUITE_END(); // Connect
+
+BOOST_FIXTURE_TEST_SUITE(Send, WebSocketClientTestFixture);
+
+BOOST_AUTO_TEST_CASE(fail_send_before_connect, *gTimeout)
+{
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+	const std::string message {"Hello WebSocket"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnSend {false};
+    auto onSend {[&calledOnSend](auto ec) {
+        calledOnSend = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::connection_aborted);
+    }};
+    client.Send(message, onSend);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnSend);
+}
+
+BOOST_AUTO_TEST_CASE(fail_send, *gTimeout)
+{
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+	const std::string message {"Hello WebSocket"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+	MockTlsWebSocketStream::write_ec = boost::asio::error::connection_reset;
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+	bool calledOnConnect {false};
+	bool calledOnSend {false};
+	auto onSend {[&calledOnSend, &client](auto ec) {
+        calledOnSend = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::connection_reset);
+		client.Close();
+    }};
+    auto onConnect {[&calledOnConnect, &client, &onSend, message](auto ec) {
+        calledOnConnect = true;
+        BOOST_CHECK(!ec);
+		client.Send(message, onSend);
+    }};
+
+    client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+	BOOST_CHECK(calledOnConnect);
+    BOOST_CHECK(calledOnSend);
+}
+
+BOOST_AUTO_TEST_CASE(successfull_send, *gTimeout)
+{
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+	const std::string message {"Hello WebSocket"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+	MockTlsWebSocketStream::sReadBuffer = message;
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+	bool calledOnMessage {false};
+	auto onMessage {[&calledOnMessage, &client, &message](auto ec, auto&& msg) {
+        calledOnMessage = true;
+        BOOST_CHECK_EQUAL(msg, message);
+		client.Close();
+    }};
+
+    client.Connect(nullptr, onMessage);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnMessage);
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // Send
+
+BOOST_FIXTURE_TEST_SUITE(Close, WebSocketClientTestFixture);
+
+BOOST_AUTO_TEST_CASE(fail_close_before_connect, *gTimeout)
+{
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnClose {false};
+	auto onClose {[&calledOnClose](auto ec) {
+        calledOnClose = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::connection_aborted);
+    }};
+
+	client.Close(onClose);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnClose);
+}
+
+BOOST_AUTO_TEST_CASE(successfull_close, *gTimeout)
+{
+    const std::string url {"echo.websocket.org"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    MockWebSocketClient client {url, endpoint, port, ioc, ctx};
+	bool calledOnConnect {false};
+    bool calledOnClose {false};
+	auto onClose {[&calledOnClose](auto ec) {
+        calledOnClose = true;
+        BOOST_CHECK(!ec);
+    }};
+	auto onConnect { [&calledOnConnect, &client, &onClose](auto ec) {
+		calledOnConnect = true;
+		BOOST_CHECK(!ec);
+		client.Close(onClose);
+	}};
+	client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+	BOOST_CHECK(calledOnConnect);
+    BOOST_CHECK(calledOnClose);
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // Close
+
+BOOST_AUTO_TEST_SUITE_END(); // mock_boost
 
 BOOST_AUTO_TEST_SUITE_END(); // class_WebSocketClient
 

@@ -24,8 +24,6 @@ public:
     {
     }
 
-    /*! \brief Mock for resolver::async_resolve
-     */
 	template <typename ResolveHandler>
 	void async_resolve(
 		boost::string_view host,
@@ -82,7 +80,6 @@ public:
 
 private:
 	boost::asio::strand<boost::asio::io_context::executor_type> m_context;	
-
 };
 
 inline boost::system::error_code MockResolver::resolve_ec {};
@@ -97,8 +94,6 @@ public:
 
     static boost::system::error_code connect_ec;
 
-    /*! \brief Mock for tcp_stream::async_connect
-     */
     template <typename ConnectHandler>
     void async_connect(
         endpoint_type type,
@@ -110,7 +105,6 @@ public:
             void (boost::system::error_code)
         >(
             [](auto&& handler, auto stream) {
-                // Call the user callback.
                 boost::asio::post(
                     stream->get_executor(),
                     boost::beast::bind_handler(
@@ -125,7 +119,6 @@ public:
     }
 };
 
-// Out-of-line static member initialization
 inline boost::system::error_code MockTcpStream::connect_ec {};
 
 // This overload is required by Boost.Beast when you define a custom stream.
@@ -150,8 +143,6 @@ public:
 
 	static boost::system::error_code handshake_ec;
 
-	/*! \brief Mock for ssl_stream::async_handshake
-     */
     template <typename HandshakeHandler>
     void async_handshake(
         boost::asio::ssl::stream_base::handshake_type type,
@@ -163,7 +154,6 @@ public:
             void (boost::system::error_code)
         >(
             [](auto&& handler, auto stream) {
-                // Call the user callback.
                 boost::asio::post(
                     stream->get_executor(),
                     boost::beast::bind_handler(
@@ -178,7 +168,6 @@ public:
     }
 };
 
-// Out-of-line static member initialization
 template<typename NextLayer>
 inline boost::system::error_code MockSslStream<NextLayer>::handshake_ec {};
 
@@ -203,6 +192,11 @@ public:
     using boost::beast::websocket::stream<NextLayer>::stream;
 
 	static boost::system::error_code handshake_ec;
+	static boost::system::error_code write_ec;
+	static boost::system::error_code read_ec;
+	static boost::system::error_code close_ec;
+
+	static std::string sReadBuffer;
 
 	template<class HandshakeHandler>
 	void async_handshake(
@@ -215,7 +209,7 @@ public:
             void (boost::system::error_code)
         >(
             [](auto&& handler, auto stream, auto host, auto targer) {
-                // Call the user callback.
+				stream->m_closed = false;
                 boost::asio::post(
                     stream->get_executor(),
                     boost::beast::bind_handler(
@@ -230,20 +224,184 @@ public:
 			target.to_string()
         );
     }
+
+	template<class ConstBufferSequence, class WriteHandler>
+	void async_write(
+		ConstBufferSequence const& buffers,
+		WriteHandler&& handler)
+    {
+        return boost::asio::async_initiate<
+            WriteHandler,
+            void (boost::system::error_code, size_t)
+        >(
+            [](auto&& handler, auto stream, auto& buffers) {
+				if (stream->m_closed) {
+					boost::asio::post(
+                    stream->get_executor(),
+                    boost::beast::bind_handler(
+                        std::move(handler),
+                        boost::asio::error::connection_aborted,
+						0
+                    ));
+				}
+				else {
+					boost::asio::post(
+						stream->get_executor(),
+						boost::beast::bind_handler(
+							std::move(handler),
+							MockWebSocketStream::write_ec,
+							MockWebSocketStream::write_ec ? 0 : buffers.size()
+						)
+					);
+				}
+            },
+            handler,
+            this,
+			buffers
+        );
+    }
+
+	template<class DynamicBuffer, class ReadHandler>
+	void async_read(
+		DynamicBuffer& buffer,
+    	ReadHandler&& handler)
+    {
+        return boost::asio::async_initiate<
+            ReadHandler,
+            void (boost::system::error_code, size_t)
+        >(
+            [this](auto&& handler, auto stream, auto& buffer) {
+				RecursiveRead(handler, buffer);
+            },
+            handler,
+            this,
+			buffer
+        );
+    }
+
+	template<class CloseHandler>
+	void async_close(
+		boost::beast::websocket::close_reason const& cr,
+		CloseHandler&& handler)
+    {
+        return boost::asio::async_initiate<
+            CloseHandler,
+            void (boost::system::error_code)
+        >(
+            [](auto&& handler, auto stream) {
+                if (stream->m_closed) {
+					boost::asio::post(
+                    stream->get_executor(),
+                    boost::beast::bind_handler(
+                        std::move(handler),
+                        boost::asio::error::connection_aborted
+                    ));
+				}
+				else {
+					if (!MockWebSocketStream::close_ec) {
+						stream->m_closed = true;
+					}
+
+					boost::asio::post(
+                    stream->get_executor(),
+                    boost::beast::bind_handler(
+                        std::move(handler),
+                        MockWebSocketStream::close_ec
+                    ));
+				}
+            },
+            handler,
+            this
+        );
+    }
+
+
+private:
+	bool m_closed {true};
+
+		// This function mimicks a socket reading messages. It's the function we
+	// call from async_read.
+	template <typename DynamicBuffer, typename ReadHandler>
+	void RecursiveRead(
+		ReadHandler&& handler,
+		DynamicBuffer& buffer)
+	{
+		if (m_closed) {
+			// If the connection has been closed, the read operation aborts.
+			boost::asio::post(
+				this->get_executor(),
+				boost::beast::bind_handler(
+					std::move(handler),
+					boost::asio::error::operation_aborted,
+					0
+				)
+			);
+		} else {
+			// Read the buffer. This may be empty — For testing purposes, we
+			// interpret this as "no new message".
+			size_t nRead;
+			nRead = MockWebSocketStream::sReadBuffer.size();
+			nRead = boost::asio::buffer_copy(
+				buffer.prepare(nRead),
+				boost::asio::buffer(MockWebSocketStream::sReadBuffer)
+			);
+			buffer.commit(nRead);
+
+			// We clear the mock buffer for the next read.
+			MockWebSocketStream::sReadBuffer = "";
+
+			if (nRead == 0) {
+				// If there was nothing to read, we recursively go and wait for
+				// a new message.
+				// Note: We can't just loop on RecursiveRead, we have to use
+				//       post, otherwise this handler would be holding the
+				//       io_context hostage.
+				boost::asio::post(
+					this->get_executor(),
+					[this, handler = std::move(handler), &buffer]() {
+						RecursiveRead(handler, buffer);
+					}
+				);
+			} else {
+				// On a legitimate message, just call the async_read original
+				// handler.
+				boost::asio::post(
+					this->get_executor(),
+					boost::beast::bind_handler(
+						std::move(handler),
+						MockWebSocketStream::read_ec,
+						nRead
+					)
+				);
+			}
+		}
+	}
+
 };
 
-// Out-of-line static member initialization
 template<typename NextLayer>
-inline boost::system::error_code MockWebSocketStream<NextLayer>::handshake_ec {};
+boost::system::error_code MockWebSocketStream<NextLayer>::handshake_ec {};
+
+template<typename NextLayer>
+boost::system::error_code MockWebSocketStream<NextLayer>::write_ec {};
+
+template<typename NextLayer>
+boost::system::error_code MockWebSocketStream<NextLayer>::read_ec {};
+
+template<typename NextLayer>
+boost::system::error_code MockWebSocketStream<NextLayer>::close_ec {};
+
+template <typename NextLayer>
+std::string MockWebSocketStream<NextLayer>::sReadBuffer = "";
 
 using MockTlsStream = MockSslStream<MockTcpStream>;
 
-using MockTlsWebStream = MockWebSocketStream<MockTlsStream>;
+using MockTlsWebSocketStream = MockWebSocketStream<MockTlsStream>;
 
 /*! \brief Type alias for the mocked WebSocketClient.
  *
  *  For now we only mock the DNS resolver.
  */
-using MockWebSocketClient = WebSocketClient<MockResolver, MockTlsWebStream>;
+using MockWebSocketClient = WebSocketClient<MockResolver, MockTlsWebSocketStream>;
 
 } // NetworkMonitor
