@@ -228,14 +228,14 @@ bool TransportNetwork::SetTravelTime(
 	}
 
 	bool foundEdge {false};
-	auto setTravelTime = [&travelTime, &foundEdge](auto stationFrom, auto stationTo) {
+	auto setTravelTime {[&travelTime, &foundEdge](auto stationFrom, auto stationTo) {
 		for (auto& edge : stationFrom->edges) {
 			if (edge.next == stationTo) {
 				edge.travelTime = travelTime;
 				foundEdge = true;
 			}
 		}
-	};
+	}};
 	setTravelTime(stationA, stationB);
 	setTravelTime(stationB, stationA);
 
