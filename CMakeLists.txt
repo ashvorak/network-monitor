@@ -43,6 +43,22 @@ target_link_libraries(network-monitor
 	PRIVATE	
 		CURL::CURL
 )
+set(SOURCES
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+)
+add_executable(network-monitor-core ${SOURCES})
+target_compile_features(network-monitor-core
+    PRIVATE
+        cxx_std_17
+)
+target_link_libraries(network-monitor-core
+    PRIVATE
+        network-monitor
+		Boost::Boost
+		OpenSSL::OpenSSL
+		std::filesystem
+)
+
 
 # Tests
 set(TESTS_SOURCES
